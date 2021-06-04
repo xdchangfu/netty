@@ -32,6 +32,12 @@ import static io.netty.util.internal.ObjectUtil.checkPositive;
 import static java.lang.Integer.MAX_VALUE;
 
 /**
+ * 消息解码器
+ * 典型的模板模式
+ * 用户可以基于此模板定制自己的私有协议
+ * 主要解决的问题是TCP的粘包，就是从请求流中解析出一个一个的客户端请求
+ * 解码器的职责是面向输入的，解析请求的（输入流）
+ *
  * {@link ChannelInboundHandlerAdapter} which decodes bytes in a stream-like fashion from one {@link ByteBuf} to an
  * other Message type.
  *
@@ -78,6 +84,13 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
      * Cumulate {@link ByteBuf}s by merge them into one {@link ByteBuf}'s, using memory copies.
      */
     public static final Cumulator MERGE_CUMULATOR = new Cumulator() {
+
+        /**
+         * @param alloc 具体的内存分配器
+         * @param cumulation    已累计接收的自己缓冲
+         * @param in    本次读取的字节缓冲区
+         * @return
+         */
         @Override
         public ByteBuf cumulate(ByteBufAllocator alloc, ByteBuf cumulation, ByteBuf in) {
             if (!cumulation.isReadable() && in.isContiguous()) {
@@ -87,6 +100,9 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
             }
             try {
                 final int required = in.readableBytes();
+                // 本次读取的字节缓冲区
+                // 首先检测当前的累积缓存区是否能够容纳新增加的ByteBuf,如果容量不够，则需要扩展ByteBuf，为了避免内存泄漏，手动去扩展
+                // 如果累积缓存区引用数超过1，也需要扩展
                 if (required > cumulation.maxWritableBytes() ||
                         (required > cumulation.maxFastWritableBytes() && cumulation.refCnt() > 1) ||
                         cumulation.isReadOnly()) {
@@ -94,14 +110,17 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
                     // - cumulation cannot be resized to accommodate the additional data
                     // - cumulation can be expanded with a reallocation operation to accommodate but the buffer is
                     //   assumed to be shared (e.g. refCnt() > 1) and the reallocation may not be safe.
+                    // 扩充累积缓存区
                     return expandCumulation(alloc, cumulation, in);
                 }
+                // 将新输入的字节写入到累积缓存区
                 cumulation.writeBytes(in, in.readerIndex(), required);
                 in.readerIndex(in.writerIndex());
                 return cumulation;
             } finally {
                 // We must release in in all cases as otherwise it may produce a leak if writeBytes(...) throw
                 // for whatever release (for example because of OutOfMemoryError)
+                // 释放缓存区
                 in.release();
             }
         }
@@ -237,6 +256,12 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
         }
     }
 
+    /**
+     * 该方法主要的实现思路是，如果内部的累积缓存区可读，则需要将剩余的字节处理，然后释放内部累积缓存区，并设置为空，
+     * 然后提供一个钩子函数，供子类去实现。handlerRemoved0(ctx)
+     * @param ctx
+     * @throws Exception
+     */
     @Override
     public final void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
         if (decodeState == STATE_CALLING_CHILD_DECODE) {
@@ -267,12 +292,20 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        // 如果消息是字节流(ByteBuf)，则进行解码，否则直接转发给下游Handler处理
         if (msg instanceof ByteBuf) {
+            /**
+             * 新建一个List，每一个元素代表解码后的一条完整的客户端请求，在Netty 5的实现中，ChannelHandler的执行是线程安全的，
+             * 因为每一个Channel相关事件的执行都在与Channel绑定的线程执行器(EventLoop)中执行。
+             * 由于这里使用了线程本地对象池(Recycler)，ArrayList是可以重复使用的。能在这里使用线程本地池，为了线程安全，线程池的的线程个数应该是1个
+             */
             CodecOutputList out = CodecOutputList.newInstance();
             try {
+                // 如果当前的累积区为空，说明是初次解码，直接设置累积区为本次读入的字节。否则，将读入的字节添加到累积区。
                 first = cumulation == null;
                 cumulation = cumulator.cumulate(ctx.alloc(),
                         first ? Unpooled.EMPTY_BUFFER : cumulation, (ByteBuf) msg);
+                // 解码器具体逻辑实现
                 callDecode(ctx, cumulation, out);
             } catch (DecoderException e) {
                 throw e;
@@ -280,6 +313,7 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
                 throw new DecoderException(e);
             } finally {
                 try {
+                    // 如果累积缓存区不为空并且不可读，释放该累积缓存区
                     if (cumulation != null && !cumulation.isReadable()) {
                         numReads = 0;
                         cumulation.release();
@@ -293,8 +327,10 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
 
                     int size = out.size();
                     firedChannelRead |= out.insertSinceRecycled();
+                    // 将解码后的一条一条客户端请求（消息）转发给下游Handler进行处理
                     fireChannelRead(ctx, out, size);
                 } finally {
+                    // 将资源回收，放入对象池，其实这里有资源泄露的可能
                     out.recycle();
                 }
             }
@@ -349,6 +385,11 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
         }
     }
 
+    /**
+     * 通道非激活事件实现
+     * @param ctx
+     * @throws Exception
+     */
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         channelInputClosed(ctx, true);
@@ -419,15 +460,16 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
      * Called once data should be decoded from the given {@link ByteBuf}. This method will call
      * {@link #decode(ChannelHandlerContext, ByteBuf, List)} as long as decoding should take place.
      *
-     * @param ctx           the {@link ChannelHandlerContext} which this {@link ByteToMessageDecoder} belongs to
-     * @param in            the {@link ByteBuf} from which to read data
-     * @param out           the {@link List} to which decoded messages should be added
+     * @param ctx           the {@link ChannelHandlerContext} which this {@link ByteToMessageDecoder} belongs to    执行上下文
+     * @param in            the {@link ByteBuf} from which to read data                                             当前累积的缓存区
+     * @param out           the {@link List} to which decoded messages should be added                              解码出消息的集合
      */
     protected void callDecode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
         try {
+            // 如果当前累积区可读
             while (in.isReadable()) {
+                // 当前解码后的消息条数，该值主要是判断本次解码，是否成功解码到消息
                 final int outSize = out.size();
-
                 if (outSize > 0) {
                     fireChannelRead(ctx, out, outSize);
                     out.clear();
@@ -442,6 +484,7 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
                     }
                 }
 
+                // 当前累积缓存区当前可读字节数。同样是用于判断是否成功解码
                 int oldInputLength = in.readableBytes();
                 decodeRemovalReentryProtection(ctx, in, out);
 
@@ -453,6 +496,7 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
                     break;
                 }
 
+                // 如果没有解码出消息（累积缓存区中的内容没有包含一个完整的请求信息，并且累积缓存区的可读数据没有发生变化，则结束本次解码
                 if (out.isEmpty()) {
                     if (oldInputLength == in.readableBytes()) {
                         break;
@@ -461,6 +505,9 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
                     }
                 }
 
+                // 如果解码出消息，但是累积缓存区的可读数据没有发生变化，则抛出异常
+                // 如果没有成功从本次累积缓存区解码出需要的消息，则不能修改累积缓存区的readerIndex,writerIndex。
+                // 如果解码出合适的消息，则readerIndex,writerIndex要修改成已解析的字节的位置。
                 if (oldInputLength == in.readableBytes()) {
                     throw new DecoderException(
                             StringUtil.simpleClassName(getClass()) +
@@ -531,6 +578,15 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
         }
     }
 
+    /**
+     * 这里有个非常关键的点：
+     *  每次扩展的时候，都是产生一个新的累积缓存区，这里主要是确保每一次通道读，
+     *  所涉及的缓存区不是同一个，这样减少释放跟踪的难度，避免内存泄露
+     * @param alloc
+     * @param oldCumulation
+     * @param in
+     * @return
+     */
     static ByteBuf expandCumulation(ByteBufAllocator alloc, ByteBuf oldCumulation, ByteBuf in) {
         int oldBytes = oldCumulation.readableBytes();
         int newBytes = in.readableBytes();

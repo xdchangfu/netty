@@ -23,6 +23,8 @@ import io.netty.util.internal.UnstableApi;
 import static io.netty.util.internal.ObjectUtil.checkNotNull;
 
 /**
+ *  在处理通道读事件的时候，如何确定需要分配多大的ByteBuf呢？
+ *  分配一个接收ByteBuf，希望这个容量足够大，能够容纳通道中可读数据，但又尽量少，够用就好，别浪费空间
  * Allocates a new receive buffer whose capacity is probably large enough to read all inbound data and small enough
  * not to waste its space.
  */
@@ -45,6 +47,7 @@ public interface RecvByteBufAllocator {
         ByteBuf allocate(ByteBufAllocator alloc);
 
         /**
+         * 只返回猜测，建议的容量(capacity)，不执行实际的内存申请
          * Similar to {@link #allocate(ByteBufAllocator)} except that it does not allocate anything but just tells the
          * capacity.
          */

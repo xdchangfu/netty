@@ -34,27 +34,48 @@ import static java.lang.Math.min;
  */
 public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufAllocator {
 
+    /**
+     * 分配的最小容量
+     */
     static final int DEFAULT_MINIMUM = 64;
     // Use an initial value that is bigger than the common MTU of 1500
+    /**
+     * 初始容量
+     */
     static final int DEFAULT_INITIAL = 2048;
+    /**
+     * 最大容量64k
+     */
     static final int DEFAULT_MAXIMUM = 65536;
 
+    /**
+     * 增长索引数，在SIZE_TABLE下的索引
+     */
     private static final int INDEX_INCREMENT = 4;
+    /**
+     * 减少索引数
+     */
     private static final int INDEX_DECREMENT = 1;
 
+    /**
+     * 小于512个字节，按16个字节递增，大于512字节，成倍增长
+     */
     private static final int[] SIZE_TABLE;
 
     static {
         List<Integer> sizeTable = new ArrayList<Integer>();
+        // 小于512字节，从16开始，以16递增
         for (int i = 16; i < 512; i += 16) {
             sizeTable.add(i);
         }
 
         // Suppress a warning since i becomes negative when an integer overflow happens
+        // 大于512字节，成倍增长，该循环在超过int最大值时退出
         for (int i = 512; i > 0; i <<= 1) { // lgtm[java/constant-comparison]
             sizeTable.add(i);
         }
 
+        // SIZE_TABLE的初始化，其实这里有效使用的最大内存为65536, 64K
         SIZE_TABLE = new int[sizeTable.size()];
         for (int i = 0; i < SIZE_TABLE.length; i ++) {
             SIZE_TABLE[i] = sizeTable.get(i);
@@ -68,6 +89,7 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
     public static final AdaptiveRecvByteBufAllocator DEFAULT = new AdaptiveRecvByteBufAllocator();
 
     private static int getSizeTableIndex(final int size) {
+        // 典型的二分查找算法
         for (int low = 0, high = SIZE_TABLE.length - 1;;) {
             if (high < low) {
                 return low;
@@ -92,12 +114,25 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
     }
 
     private final class HandleImpl extends MaxMessageHandle {
+        /**
+         * DEFAULT_MINIMUM 所在SIZE_TABLE中的下标
+         */
         private final int minIndex;
+        /**
+         * DEFAULT_MAXIMUM 所在SIZE_TABLE中的下标
+         */
         private final int maxIndex;
         private int index;
+        /**
+         * 下一次分配的ByteBuf大小
+         */
         private int nextReceiveBufferSize;
+        /**
+         * 是否需要减少待分配内存的大小
+         */
         private boolean decreaseNow;
 
+        // initial 初始时，分配的buffer大小，默认为1K
         HandleImpl(int minIndex, int maxIndex, int initial) {
             this.minIndex = minIndex;
             this.maxIndex = maxIndex;
@@ -123,7 +158,14 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
             return nextReceiveBufferSize;
         }
 
+        /**
+         * 该方法是有IO线程反馈当前读取的字节大小，方便分配器合理的分配内存
+         * @param actualReadBytes
+         */
         private void record(int actualReadBytes) {
+            // 首先，计算当前位置，往前(INDEX_DECREMENT -1)位置代表的内存大小，
+            // 如果actualReadBytes 小于这个内存，则需要减少分配的内存大小，INDEX_DECREMENT 这里默认为4，起到一个自适应的频率控制
+            // 可知，需要联系两次读都小于上面那个值，才会缩小分配的内存数量
             if (actualReadBytes <= SIZE_TABLE[max(0, index - INDEX_DECREMENT)]) {
                 if (decreaseNow) {
                     index = max(index - INDEX_DECREMENT, minIndex);
@@ -132,7 +174,7 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
                 } else {
                     decreaseNow = true;
                 }
-            } else if (actualReadBytes >= nextReceiveBufferSize) {
+            } else if (actualReadBytes >= nextReceiveBufferSize) {  // 如果时间读取字节数大于nextReceiveBufferSize 的大小，则直接增大下次分配的大小
                 index = min(index + INDEX_INCREMENT, maxIndex);
                 nextReceiveBufferSize = SIZE_TABLE[index];
                 decreaseNow = false;

@@ -924,6 +924,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // Netty封装的写缓存的数据结构
             final ChannelOutboundBuffer outboundBuffer = this.outboundBuffer;
             if (outboundBuffer == null || outboundBuffer.isEmpty()) {
                 return;
@@ -932,6 +933,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             inFlush0 = true;
 
             // Mark all pending write requests as failure if the channel is inactive.
+            // 如果通道没有激活，调用outboundBuffer.failFlushed方法
             if (!isActive()) {
                 try {
                     // Check if we need to generate the exception at all.
@@ -950,6 +952,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
 
             try {
+                // 写入的具体实现，由子类实现，本文重点分析NioSocketChannel,故目光将移动到NioSocketChannel的doWriter方法
                 doWrite(outboundBuffer);
             } catch (Throwable t) {
                 handleWriteError(t);

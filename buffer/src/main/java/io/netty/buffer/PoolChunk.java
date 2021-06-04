@@ -21,6 +21,9 @@ import java.util.Deque;
 import java.util.PriorityQueue;
 
 /**
+ * PoolChunk会涉及到具体的内存,泛型T表示byte[](堆内存)、或java.nio.ByteBuffer(堆外内存)
+ *
+ *
  * Description of algorithm for PageRun/PoolSubpage allocation from PoolChunk
  *
  * Notation: The following terms are important to understand the code
@@ -140,9 +143,18 @@ final class PoolChunk<T> implements PoolChunkMetric {
     static final int SIZE_SHIFT = INUSED_BIT_LENGTH + IS_USED_SHIFT;
     static final int RUN_OFFSET_SHIFT = SIZE_BIT_LENGTH + SIZE_SHIFT;
 
+    /**
+     * 该PoolChunk所属的PoolArena
+     */
     final PoolArena<T> arena;
     final Object base;
+    /**
+     * 具体用来表示内存；byte[]或java.nio.ByteBuffer
+     */
     final T memory;
+    /**
+     * 是否是可重用的，unpooled=false表示可重用
+     */
     final boolean unpooled;
 
     /**
@@ -156,12 +168,23 @@ final class PoolChunk<T> implements PoolChunkMetric {
     private final LongPriorityQueue[] runsAvail;
 
     /**
+     * 该PoolChunk所包含的PoolSupage。也就是PoolChunk连续的可用内存
+     *
      * manage all subpages in this chunk
      */
     private final PoolSubpage<T>[] subpages;
 
+    /**
+     * 每个PoolSubpage的大小，默认为8192个字节（8K)
+     */
     private final int pageSize;
+    /**
+     * pageSize 2的 pageShifts幂
+     */
     private final int pageShifts;
+    /**
+     * PoolChunk的总内存大小,chunkSize =   (1<<maxOrder) * pageSize
+     */
     private final int chunkSize;
 
     // Use as cache for ByteBuffer created from the memory. These are just duplicates and so are only a container
@@ -171,9 +194,18 @@ final class PoolChunk<T> implements PoolChunkMetric {
     // This may be null if the PoolChunk is unpooled as pooling the ByteBuffer instances does not make any sense here.
     private final Deque<ByteBuffer> cachedNioBuffers;
 
+    /**
+     * 当前PoolChunk空闲的内存
+     */
     int freeBytes;
 
+    /**
+     * 一个PoolChunk分配后，会根据使用率挂在一个PoolChunkList中，在(PoolArena的PoolChunkList上)
+     */
     PoolChunkList<T> parent;
+    /**
+     * PoolChunk本身设计为一个链表结构
+     */
     PoolChunk<T> prev;
     PoolChunk<T> next;
 

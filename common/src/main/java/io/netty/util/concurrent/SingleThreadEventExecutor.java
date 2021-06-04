@@ -55,10 +55,25 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     private static final InternalLogger logger =
             InternalLoggerFactory.getInstance(SingleThreadEventExecutor.class);
 
+    /**
+     * 状态，，，未启动接受任务
+     */
     private static final int ST_NOT_STARTED = 1;
+    /**
+     * 状态，，，已启动，运行
+     */
     private static final int ST_STARTED = 2;
+    /**
+     * 状态，，，关闭中（平滑关闭）
+     */
     private static final int ST_SHUTTING_DOWN = 3;
+    /**
+     * 状态，，，已关闭
+     */
     private static final int ST_SHUTDOWN = 4;
+    /**
+     * 状态，，，终止
+     */
     private static final int ST_TERMINATED = 5;
 
     private static final Runnable NOOP_TASK = new Runnable() {
@@ -74,22 +89,37 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             AtomicReferenceFieldUpdater.newUpdater(
                     SingleThreadEventExecutor.class, ThreadProperties.class, "threadProperties");
 
+    /**
+     * 该线程模型执行器 任务队列，子类可定制自己的任务队列
+     */
     private final Queue<Runnable> taskQueue;
 
+    /**
+     * 当前执行器运行的线程
+     */
     private volatile Thread thread;
     @SuppressWarnings("unused")
     private volatile ThreadProperties threadProperties;
+    /**
+     * 具体的线程池,此处为 Netty实现的ForkJoinPool
+     */
     private final Executor executor;
     private volatile boolean interrupted;
 
     private final CountDownLatch threadLock = new CountDownLatch(1);
     private final Set<Runnable> shutdownHooks = new LinkedHashSet<Runnable>();
+    /**
+     * 如果设置为true, 当且仅当 添加一个任务时，才唤醒选择器，比如是否唤醒 select() 函数。
+     */
     private final boolean addTaskWakesUp;
     private final int maxPendingTasks;
     private final RejectedExecutionHandler rejectedExecutionHandler;
 
     private long lastExecutionTime;
 
+    /**
+     * 当前的状态
+     */
     @SuppressWarnings({ "FieldMayBeFinal", "unused" })
     private volatile int state = ST_NOT_STARTED;
 
@@ -821,10 +851,14 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     private void execute(Runnable task, boolean immediate) {
+        // 是否在事件循环中
         boolean inEventLoop = inEventLoop();
+        // 如果是EventLoop执行的任务，直接加入任务队列
         addTask(task);
         if (!inEventLoop) {
+            // 如果是其他线程，则启动调度
             startThread();
+            // 如果停止执行，则拒绝服务
             if (isShutdown()) {
                 boolean reject = false;
                 try {
@@ -842,6 +876,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             }
         }
 
+        // 唤醒选择器，感觉这里addTaskWakesUp 这个变量有点问题，不过具体的唤醒选择器逻辑是对于事件模型来说比较重要，在相关的子类中都有重写
         if (!addTaskWakesUp && immediate) {
             wakeup(inEventLoop);
         }
@@ -938,6 +973,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private void startThread() {
         if (state == ST_NOT_STARTED) {
+            // 支持多次调用，因为对状态进行了CAS检测并设置，如果启动状态为未启动，并设置为启动中成功
             if (STATE_UPDATER.compareAndSet(this, ST_NOT_STARTED, ST_STARTED)) {
                 boolean success = false;
                 try {

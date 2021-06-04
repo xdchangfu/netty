@@ -31,6 +31,8 @@ import java.nio.channels.ScatteringByteChannel;
 import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
 
 /**
+ * 非池化的堆外内存（直接内存）
+ *
  * A NIO {@link ByteBuffer} based buffer. It is recommended to use
  * {@link UnpooledByteBufAllocator#directBuffer(int, int)}, {@link Unpooled#directBuffer(int)} and
  * {@link Unpooled#wrappedBuffer(ByteBuffer)} instead of calling the constructor explicitly.
@@ -138,25 +140,34 @@ public class UnpooledDirectByteBuf extends AbstractReferenceCountedByteBuf {
         return capacity;
     }
 
+    /**
+     * 容量的扩容
+     * @param newCapacity
+     * @return
+     */
     @Override
     public ByteBuf capacity(int newCapacity) {
+        // 检测一下访问性，可达性，就是引用数必须大于0，否则该 ByteBuf 的内部空间已经被回收了（堆外内存）
         checkNewCapacity(newCapacity);
         int oldCapacity = capacity;
         if (newCapacity == oldCapacity) {
             return this;
         }
         int bytesToCopy;
+        // 扩容操作，思路新建一个缓存区，然后将原先缓存区的数据全部写入到新的缓存区，然后释放旧的缓存区
         if (newCapacity > oldCapacity) {
             bytesToCopy = oldCapacity;
-        } else {
+        } else {    // 压缩缓存区
             trimIndicesToCapacity(newCapacity);
             bytesToCopy = newCapacity;
         }
+        // 申请一个直接缓存区，然后将原缓冲区的 postion 设置为0,将 limit 设置为 capacity, 处于释放状态（从缓存区读）
         ByteBuffer oldBuffer = buffer;
         ByteBuffer newBuffer = allocateDirect(newCapacity);
         oldBuffer.position(0).limit(bytesToCopy);
         newBuffer.position(0).limit(bytesToCopy);
         newBuffer.put(oldBuffer).clear();
+        // 释放原先的内存
         setByteBuffer(newBuffer, true);
         return this;
     }

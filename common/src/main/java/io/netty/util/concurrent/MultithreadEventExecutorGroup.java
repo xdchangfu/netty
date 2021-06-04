@@ -61,6 +61,11 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
     }
 
     /**
+     * NioEventLoopGroup的初始化方法
+     *
+     * 1个NioEventLoopGroup可以有多个 NioEventLoop，轮流接受客户端请求；
+     * 同一个NioEventLoopGroup中的NioEventLoop共同持有一个Executor,这个Executor是何许人也（io.netty.util.internal.chmv8.ForkJoinPool，并发度为 nEventExecutors）
+     *
      * Create a new instance.
      *
      * @param nThreads          the number of threads that will be used by this instance.
@@ -73,20 +78,24 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
         checkPositive(nThreads, "nThreads");
 
         if (executor == null) {
+            // 创建该线程模型的线程执行器，此处返回的是io.netty.util.internal.chmv8.ForkJoinPool，并发度为 nEventExecutors
             executor = new ThreadPerTaskExecutor(newDefaultThreadFactory());
         }
 
+        // 开始创建该组的工作EventExecutor数组，其中真正存放的实例由代码 newChild(executor, args) 中创建
         children = new EventExecutor[nThreads];
 
         for (int i = 0; i < nThreads; i ++) {
             boolean success = false;
             try {
+                // 创建一个具体的执行器、有具体的线程模型(EventLoopGroup)子类实现
                 children[i] = newChild(executor, args);
                 success = true;
             } catch (Exception e) {
                 // TODO: Think about if this is a good exception type
                 throw new IllegalStateException("failed to create a child event loop", e);
             } finally {
+                // 如果创建执行器失败，则关闭资源
                 if (!success) {
                     for (int j = 0; j < i; j ++) {
                         children[j].shutdownGracefully();
@@ -110,6 +119,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
 
         chooser = chooserFactory.newChooser(children);
 
+        // 添加相关事件通知处理器
         final FutureListener<Object> terminationListener = new FutureListener<Object>() {
             @Override
             public void operationComplete(Future<Object> future) throws Exception {

@@ -247,6 +247,12 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
         return StringUtil.simpleClassName(this) + "(directByDefault: " + directByDefault + ')';
     }
 
+    /**
+     * 容量扩容规则（容量增长规则）calculateNewCapacity 方法
+     * @param minNewCapacity    本次需要申请的最小内存
+     * @param maxCapacity       最大总内存申请值
+     * @return
+     */
     @Override
     public int calculateNewCapacity(int minNewCapacity, int maxCapacity) {
         checkPositiveOrZero(minNewCapacity, "minNewCapacity");

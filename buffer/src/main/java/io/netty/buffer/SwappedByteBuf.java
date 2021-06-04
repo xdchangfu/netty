@@ -29,6 +29,8 @@ import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 
 /**
+ *
+ * 装饰模式设计
  * Wrapper which swap the {@link ByteOrder} of a {@link ByteBuf}.
  *
  * @deprecated use the Little Endian accessors, e.g. {@code getShortLE}, {@code getIntLE}

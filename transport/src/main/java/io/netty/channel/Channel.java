@@ -28,6 +28,13 @@ import java.net.SocketAddress;
 
 
 /**
+ * 通道状态主要包括：打开、关闭、连接。
+ * 通道主要的IO操作，读(read)、写(write)、连接(connect)、绑定(bind)。
+ * 所有的IO操作都是异步的，调用诸如read,write方法后，并不保证IO操作完成，但会返回一个凭证，在IO操作成功，取消或失败后会记录在该凭证中。
+ * channel有父子关系，SocketChannel是通过ServerSocketChannel接受创建的，故SocketChannel的parent()方法返回的就是ServerSocketChannel。
+ * 在Channel使用完毕后，请调用close方法，释放通道占用的资源
+ *
+ *
  * A nexus to a network socket or a component which is capable of I/O
  * operations such as read, write, connect, and bind.
  * <p>
@@ -77,16 +84,19 @@ import java.net.SocketAddress;
 public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparable<Channel> {
 
     /**
+     * 返回全局唯一的channel id
      * Returns the globally unique identifier of this {@link Channel}.
      */
     ChannelId id();
 
     /**
+     * 返回该Channel注册的线程模型，先理解为Ractor模型的Ractor线程
      * Return the {@link EventLoop} this {@link Channel} was registered to.
      */
     EventLoop eventLoop();
 
     /**
+     *  返回该Channel由谁创建的，ServerSocketChannel返回null,SocketChannel返回创建它的ServerSocketChannel
      * Returns the parent of this channel.
      *
      * @return the parent channel.
@@ -95,31 +105,37 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
     Channel parent();
 
     /**
+     * 返回通道的配置信息
      * Returns the configuration of this channel.
      */
     ChannelConfig config();
 
     /**
+     * 通道是否打开
      * Returns {@code true} if the {@link Channel} is open and may get active later
      */
     boolean isOpen();
 
     /**
+     * 该通道是否已经注册在事件模型中，此处先参考Nio编程模型，一个通过需要注册在Register上
      * Returns {@code true} if the {@link Channel} is registered with an {@link EventLoop}.
      */
     boolean isRegistered();
 
     /**
+     * 通道是否激活
      * Return {@code true} if the {@link Channel} is active and so connected.
      */
     boolean isActive();
 
     /**
+     * 通道是否支持 调用disconnect方法后，调用connect方法
      * Return the {@link ChannelMetadata} of the {@link Channel} which describe the nature of the {@link Channel}.
      */
     ChannelMetadata metadata();
 
     /**
+     * 返回绑定的地址，服务端的Channel返回监听的地址，而客户端的Channel返回连接到服务端的本地套接字
      * Returns the local address where this channel is bound to.  The returned
      * {@link SocketAddress} is supposed to be down-cast into more concrete
      * type such as {@link InetSocketAddress} to retrieve the detailed
@@ -131,6 +147,7 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
     SocketAddress localAddress();
 
     /**
+     * 返回channel的远程套接字
      * Returns the remote address where this channel is connected to.  The
      * returned {@link SocketAddress} is supposed to be down-cast into more
      * concrete type such as {@link InetSocketAddress} to retrieve the detailed
@@ -147,12 +164,15 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
     SocketAddress remoteAddress();
 
     /**
+     * 通道的关闭凭证（许可），这里是多线程编程一种典型的设计模式，一个channle返回一个固定的
      * Returns the {@link ChannelFuture} which will be notified when this
      * channel is closed.  This method always returns the same future instance.
      */
     ChannelFuture closeFuture();
 
     /**
+     * 是否可写，如果通道的写缓冲区未满，即返回true，表示写操作可以立即
+     *  操作缓冲区，然后返回
      * Returns {@code true} if and only if the I/O thread will perform the
      * requested write operation immediately.  Any write requests made when
      * this method returns {@code false} are queued until the I/O thread is
@@ -178,11 +198,13 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
     Unsafe unsafe();
 
     /**
+     * 返回管道
      * Return the assigned {@link ChannelPipeline}.
      */
     ChannelPipeline pipeline();
 
     /**
+     * 返回ByteBuf内存分配器
      * Return the assigned {@link ByteBufAllocator} which will be used to allocate {@link ByteBuf}s.
      */
     ByteBufAllocator alloc();

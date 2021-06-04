@@ -58,12 +58,25 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(NioEventLoop.class);
 
+    /**
+     *     取消键的个数超过改造，将cancelKeys清空为0，并执行一次重新选择
+      */
     private static final int CLEANUP_INTERVAL = 256; // XXX Hard-coded value, but won't need customization.
 
+    /**
+     * 是否启用选择键优化(SelectionKeys),默认为true
+     */
     private static final boolean DISABLE_KEY_SET_OPTIMIZATION =
             SystemPropertyUtil.getBoolean("io.netty.noKeySetOptimization", false);
 
+    /**
+     * 众所周知，jdk在1.7之前的Selector的select方法会出现空轮询，导致CPU资源紧张，解决空轮询最小的空轮训次数，
+     * 如果SELECTOR_AUTO_REBUILD_THRESHOLD小于该值，则不触发Selector的重建工作。
+     */
     private static final int MIN_PREMATURE_SELECTOR_RETURNS = 3;
+    /**
+     * 如果出现轮询(select)，连续多少次未返回准备的键，则触发Selector重建。默认为512
+     */
     private static final int SELECTOR_AUTO_REBUILD_THRESHOLD;
 
     private final IntSupplier selectNowSupplier = new IntSupplier() {
@@ -113,6 +126,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
      */
     private Selector selector;
     private Selector unwrappedSelector;
+    /**
+     * 可选择的键，netty对原生Selector的select()方法返回的键的一个优化集合
+     */
     private SelectedSelectionKeySet selectedKeys;
 
     private final SelectorProvider provider;
@@ -128,8 +144,17 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     private final SelectStrategy selectStrategy;
 
+    /**
+     * ioRatio执行比例
+     */
     private volatile int ioRatio = 50;
+    /**
+     * 取消键的个数
+     */
     private int cancelledKeys;
+    /**
+     * 是否需要重新select
+     */
     private boolean needsToSelectAgain;
 
     NioEventLoop(NioEventLoopGroup parent, Executor executor, SelectorProvider selectorProvider,

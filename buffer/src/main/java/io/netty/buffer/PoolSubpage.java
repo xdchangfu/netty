@@ -24,8 +24,14 @@ import static io.netty.buffer.SizeClasses.LOG2_QUANTUM;
 
 final class PoolSubpage<T> implements PoolSubpageMetric {
 
+    /**
+     * 所属的PoolChunk
+     */
     final PoolChunk<T> chunk;
     private final int pageShifts;
+    /**
+     * 在PoolChunk的运行时内存偏移量
+     */
     private final int runOffset;
     private final int runSize;
     private final long[] bitmap;
@@ -36,8 +42,17 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
     boolean doNotDestroy;
     int elemSize;
     private int maxNumElems;
+    /**
+     * bitmap中实际使用的长度
+     */
     private int bitmapLength;
+    /**
+     * 下一个可分配的elemSize块
+     */
     private int nextAvail;
+    /**
+     * 目前可用的elemSize块数量
+     */
     private int numAvail;
 
     // TODO: Test if adding padding helps under contention

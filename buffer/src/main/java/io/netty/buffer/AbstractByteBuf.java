@@ -65,6 +65,9 @@ public abstract class AbstractByteBuf extends ByteBuf {
         }
     }
 
+    /**
+     * Netty 用来解决内存泄漏检测机制
+     */
     static final ResourceLeakDetector<ByteBuf> leakDetector =
             ResourceLeakDetectorFactory.instance().newResourceLeakDetector(ByteBuf.class);
 

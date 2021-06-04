@@ -21,6 +21,8 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import io.netty.util.internal.ReferenceCountUpdater;
 
 /**
+ * 实现引用计算的常规方法，充分利用 voliate 内存可见性与 CAS 操作完成 refCnt 变量的维护
+ *
  * Abstract base class for {@link ByteBuf} implementations that count references.
  */
 public abstract class AbstractReferenceCountedByteBuf extends AbstractByteBuf {

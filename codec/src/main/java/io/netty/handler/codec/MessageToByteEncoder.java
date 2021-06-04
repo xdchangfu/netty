@@ -27,6 +27,10 @@ import io.netty.util.internal.TypeParameterMatcher;
 
 
 /**
+ * 编码器实现
+ * 面向响应的，将响应信息按照相关约定进行组织，方便接收端解析请求
+ * 编码器主要是实现自定义协议时需要用到的，重点实现ecode方法
+ *
  * {@link ChannelOutboundHandlerAdapter} which encodes message in a stream-like fashion from one message to an
  * {@link ByteBuf}.
  *

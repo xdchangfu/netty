@@ -60,20 +60,28 @@ public class ResourceLeakDetector<T> {
      */
     public enum Level {
         /**
+         * 禁用内存泄露检测
+         *
          * Disables resource leak detection.
          */
         DISABLED,
         /**
+         * 默认的内存检测级别，以一个时间间隔，默认是每创建113个直接内存（堆外内存）时检测一次
+         *
          * Enables simplistic sampling resource leak detection which reports there is a leak or not,
          * at the cost of small overhead (default).
          */
         SIMPLE,
         /**
+         * 每次产生一个堆外内存，目前这两个在Netty的实现中等价，统一用ADVANCED来实现
+         *
          * Enables advanced sampling resource leak detection which reports where the leaked object was accessed
          * recently at the cost of high overhead.
          */
         ADVANCED,
         /**
+         * 每次产生一个堆外内存，目前这两个在Netty的实现中等价，统一用ADVANCED来实现
+         *
          * Enables paranoid resource leak detection which reports where the leaked object was accessed recently,
          * at the cost of the highest possible overhead (for testing purposes only).
          */
@@ -164,11 +172,21 @@ public class ResourceLeakDetector<T> {
     private final Set<DefaultResourceLeak<?>> allLeaks =
             Collections.newSetFromMap(new ConcurrentHashMap<DefaultResourceLeak<?>, Boolean>());
 
+    /**
+     * 引用队列，该引用队列正存放的是 ResoureLeak 对象链，代表着这里面的引用对象所指向的对象已被垃圾回收。
+     * 按照常理，如果该 ResourceLeak 对象，也同时存在于上面的双端链表中(新版本中有改动，链表已不存在了)，说明发生了内存泄漏
+     */
     private final ReferenceQueue<Object> refQueue = new ReferenceQueue<Object>();
     private final Set<String> reportedLeaks =
             Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 
+    /**
+     * 检测对象的完全限定名称,主要用途用于报告内存泄漏时，相关的详细信息
+     */
     private final String resourceType;
+    /**
+     * 内存泄漏检测级别是SIMPLE时，的检测频率，默认113，单位为个，而不是时间
+     */
     private final int samplingInterval;
 
     /**

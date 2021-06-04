@@ -134,12 +134,15 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
         @Override
         public final void read() {
             final ChannelConfig config = config();
+            // 如果未开启自动读，并且没有读事件等待，则移除读事件。
             if (shouldBreakReadReady(config)) {
+                // 移除读事件，在具体的子类中实现，在 AbstractNioUnsafe中的具体实现
                 clearReadPending();
                 return;
             }
             final ChannelPipeline pipeline = pipeline();
             final ByteBufAllocator allocator = config.getAllocator();
+            // @4 内存分配的方式，这里的目的就是可以分配足够的内存字节以便于从通道读取数据
             final RecvByteBufAllocator.Handle allocHandle = recvBufAllocHandle();
             allocHandle.reset(config);
 
@@ -147,8 +150,11 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             boolean close = false;
             try {
                 do {
+                    // 利用代码@4处的分配器，分配一个ByteBuf,用于接收通道中的数据
                     byteBuf = allocHandle.allocate(allocator);
+                    // 从通道中读取数据，具体在子类中实现，在NioSocketChannel中的实现如下
                     allocHandle.lastBytesRead(doReadBytes(byteBuf));
+                    // 如果没有读到可用数据，则回收刚申请的ByteBuf,如果读到的数据小于0，则说明需要将通道关闭。设置close=true,并跳出循环
                     if (allocHandle.lastBytesRead() <= 0) {
                         // nothing was read. release the buffer.
                         byteBuf.release();
@@ -163,17 +169,20 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
 
                     allocHandle.incMessagesRead(1);
                     readPending = false;
+                    // 将读到的内容(ByteBuf)通过管道传播到各个Handler，此时Handler的处理，默认都会在IO线程中处理
                     pipeline.fireChannelRead(byteBuf);
                     byteBuf = null;
                 } while (allocHandle.continueReading());
 
                 allocHandle.readComplete();
+                // 触发读完成事件
                 pipeline.fireChannelReadComplete();
 
                 if (close) {
                     closeOnRead(pipeline);
                 }
             } catch (Throwable t) {
+                // 如果发生异常触发异常事件
                 handleReadException(pipeline, byteBuf, t, close, allocHandle);
             } finally {
                 // Check if there is a readPending which was not processed yet.

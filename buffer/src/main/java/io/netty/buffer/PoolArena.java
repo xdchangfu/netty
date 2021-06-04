@@ -29,6 +29,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static io.netty.buffer.PoolChunk.isSubpage;
 import static java.lang.Math.max;
 
+/**
+ * 该类是逻辑意义上一块连续的内存，之所以说它是逻辑的，因为该类不涉及到具体的内存存储
+ * 什么是具体的内存呢？我们一般用 byte[] 字节数组表示堆内存，用 java.nio.ByteBuffer 来表示堆外内存。
+ * 所以 PoolArena 中并不会直接与 byte[] 或java.nio.ByteBuffer 打交道，而是维护一系列的 PoolChunk
+ * @param <T>
+ */
+
 abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
     static final boolean HAS_UNSAFE = PlatformDependent.hasUnsafe();
 

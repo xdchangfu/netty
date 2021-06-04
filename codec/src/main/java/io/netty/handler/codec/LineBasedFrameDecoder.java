@@ -22,6 +22,11 @@ import io.netty.util.ByteProcessor;
 import java.util.List;
 
 /**
+ * 解码器实现
+ * 是基于行分割符符合的解码器。(\n 或\r\n)
+ * 主要解决的问题是TCP的粘包，就是从请求流中解析出一个一个的客户端请求
+ * 解码器的职责是面向输入的，解析请求的（输入流）
+ *
  * A decoder that splits the received {@link ByteBuf}s on line endings.
  * <p>
  * Both {@code "\n"} and {@code "\r\n"} are handled.
@@ -96,19 +101,27 @@ public class LineBasedFrameDecoder extends ByteToMessageDecoder {
      *                          be created.
      */
     protected Object decode(ChannelHandlerContext ctx, ByteBuf buffer) throws Exception {
+        // 从累积缓存区中，试图找到行结束符合(\r\n),具体实现再看
         final int eol = findEndOfLine(buffer);
+
+        // 是否丢弃了一部分数据，当解码后的数据长度超过帧允许的最大长度时（maxLength）时，将丢弃整个累积缓存区
         if (!discarding) {
+            // 如果找到一个行结束标记，说明该累积缓存区中至少有一个完整的帧（请求信息），进入解码处理逻辑
             if (eol >= 0) {
                 final ByteBuf frame;
+                // 计算该帧（请求信息）的长度，用eof减去当前累积区域的rederIndex即可
                 final int length = eol - buffer.readerIndex();
+                // 计算分割符所占用的字节长度，如果为\r\n则为两个字节，如果\n则表示1个字节
                 final int delimLength = buffer.getByte(eol) == '\r'? 2 : 1;
 
+                // 如果帧长度超过最大允许的长度，将累积缓存区的readerIndex设置为eof加上分隔符的长度，以便下次解码。同时触发exceptionCaught事件
                 if (length > maxLength) {
                     buffer.readerIndex(eol + delimLength);
                     fail(ctx, length);
                     return null;
                 }
 
+                // 根据是剥离分割符（剥离的话，就是该帧数据不会包含分割符合），从累积缓存区中读取一帧数据，使用的方式是 readSlice方法，共用累积缓存区的数据
                 if (stripDelimiter) {
                     frame = buffer.readRetainedSlice(length);
                     buffer.skipBytes(delimLength);
@@ -116,9 +129,11 @@ public class LineBasedFrameDecoder extends ByteToMessageDecoder {
                     frame = buffer.readRetainedSlice(length + delimLength);
                 }
 
+                // 将解码处理的消息，引用加1，并返回处理,待交给下游Handler进一步处理
                 return frame;
-            } else {
+            } else { // 如果没有找到分割符，并且长度已经超过了maxLength的话，直接将该部分丢弃
                 final int length = buffer.readableBytes();
+
                 if (length > maxLength) {
                     discardedBytes = length;
                     buffer.readerIndex(buffer.writerIndex());
