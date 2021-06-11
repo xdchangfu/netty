@@ -178,11 +178,15 @@ import java.lang.annotation.Target;
 public interface ChannelHandler {
 
     /**
+     * 在调用 DefaultChannelPipeline 的 addLast(add*) 将事件监听器添加到事件处理链条时调用
      * Gets called after the {@link ChannelHandler} was added to the actual context and it's ready to handle events.
      */
     void handlerAdded(ChannelHandlerContext ctx) throws Exception;
 
     /**
+     * 在调用DefaultChannelPipeline 的 addLast(add*) 发生异常时被调用；当通道关闭后，通道取消注册后，同时会触发通道移除事件，
+     * 具体调用入口：DefaultChannelPipeline 的内部类 HeadContext 的 channelUnregistered
+     *
      * Gets called after the {@link ChannelHandler} was removed from the actual context and it doesn't handle events
      * anymore.
      */

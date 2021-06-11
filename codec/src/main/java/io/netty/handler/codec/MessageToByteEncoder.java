@@ -48,7 +48,9 @@ import io.netty.util.internal.TypeParameterMatcher;
  * </pre>
  */
 public abstract class MessageToByteEncoder<I> extends ChannelOutboundHandlerAdapter {
-
+    /**
+     * 编码器：消息（协议对象）编码成二进制字节流
+     */
     private final TypeParameterMatcher matcher;
     private final boolean preferDirect;
 

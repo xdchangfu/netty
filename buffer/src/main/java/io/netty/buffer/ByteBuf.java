@@ -246,6 +246,14 @@ import java.nio.charset.UnsupportedCharsetException;
  * {@link ByteBufOutputStream}.
  */
 public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
+    /**
+     * 如果需要，允许使用自定义的缓冲类型。
+     * 复合缓冲类型中内置的透明的零拷贝实现。
+     * 开箱即用的动态缓冲类型，具有像 StringBuffer 一样的动态缓冲能力。
+     * 不再需要调用的flip()方法。
+     * 正常情况下具有比 ByteBuffer 更快的响应速度。
+     */
+
 
     /**
      * Returns the number of bytes (octets) this buffer can contain.

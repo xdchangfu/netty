@@ -403,7 +403,8 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
                     // 如果nioBuffers个数为0，可能是其他内容的数据，比如FileRegion，则调用父类AbstractNioByteChannel的doWriter方法
                     writeSpinCount -= doWrite0(in);
                     break;
-                case 1: { // @4
+                case 1: {
+                    // 如果只有一个ByteBuffer，则不需要使用nio的 gathering write
                     // Only one ByteBuf so use non-gathering write
                     // Zero length buffers are not added to nioBuffers by ChannelOutboundBuffer, so there is no need
                     // to check if the total size of all the buffers is non-zero.
@@ -423,7 +424,7 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
                     // Zero length buffers are not added to nioBuffers by ChannelOutboundBuffer, so there is no need
                     // to check if the total size of all the buffers is non-zero.
                     // We limit the max amount to int above so cast is safe
-                    // @5
+                    // 和case 1 逻辑一样，只是调用了gathering writer api
                     long attemptedBytes = in.nioBufferSize();
                     final long localWrittenBytes = ch.write(nioBuffers, 0, nioBufferCnt);
                     if (localWrittenBytes <= 0) {
@@ -434,7 +435,7 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
                     adjustMaxBytesPerGatheringWrite((int) attemptedBytes, (int) localWrittenBytes,
                             maxBytesPerGatheringWrite);
 
-                    // @6
+                    // 将已读的字节跳过，其实就是更新内部ByteBuffer的readerIndex
                     in.removeBytes(localWrittenBytes);
                     --writeSpinCount;
                     break;
