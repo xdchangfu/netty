@@ -104,6 +104,14 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
                 RejectedExecutionHandlers.reject());
     }
 
+    /**
+     * @param nThreads  线程池中的线程数，也就是 NioEventLoop 的实例数量
+     * @param executor  我们知道，我们本身就是要构造一个线程池（Executor），为什么这里传一个 executor 实例呢？它其实不是给线程池用的，而是给 NioEventLoop 用
+     * @param chooserFactory    当我们提交一个任务到线程池的时候，线程池需要选择（choose）其中的一个线程来执行这个任务，这个就是用来实现选择策略的
+     * @param selectorProvider      需要通过它来实例化 Selector，可以看到每个线程池都持有一个 selectorProvider 实例
+     * @param selectStrategyFactory 涉及到的是线程池中线程的工作流程
+     * @param rejectedExecutionHandler  用于处理线程池中没有可用的线程来执行任务的情况。在 Netty 中稍微有一点点不一样，这个是给 NioEventLoop 实例用的
+     */
     public NioEventLoopGroup(int nThreads, Executor executor, EventExecutorChooserFactory chooserFactory,
                              final SelectorProvider selectorProvider,
                              final SelectStrategyFactory selectStrategyFactory,

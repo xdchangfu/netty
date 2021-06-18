@@ -851,12 +851,13 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     private void execute(Runnable task, boolean immediate) {
-        // 是否在事件循环中
+        // 判断添加任务的线程是否就是当前 EventLoop 中的线程
         boolean inEventLoop = inEventLoop();
-        // 如果是EventLoop执行的任务，直接加入任务队列
+        // 添加任务到之前介绍的 taskQueue 中，
+        //  如果 taskQueue 满了(默认大小 16)，默认的策略是抛出异常
         addTask(task);
         if (!inEventLoop) {
-            // 如果是其他线程，则启动调度
+            // 如果不是 NioEventLoop 内部线程提交的 task，那么判断下线程是否已经启动，没有的话，就启动线程
             startThread();
             // 如果停止执行，则拒绝服务
             if (isShutdown()) {
@@ -1008,9 +1009,12 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private void doStartThread() {
         assert thread == null;
+        // 这里的 executor 大家是不是有点熟悉的感觉，它就是一开始我们实例化 NioEventLoop 的时候传进来的 ThreadPerTaskExecutor 的实例。它是每次来一个任务，创建一个线程的那种 executor。
+        // 一旦我们调用它的 execute 方法，它就会创建一个新的线程，所以这里终于会创建 Thread 实例
         executor.execute(new Runnable() {
             @Override
             public void run() {
+                // 将 “executor” 中创建的这个线程设置为 NioEventLoop 的线程！！！
                 thread = Thread.currentThread();
                 if (interrupted) {
                     thread.interrupt();
@@ -1019,6 +1023,11 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                 boolean success = false;
                 updateLastExecutionTime();
                 try {
+                    // 执行 SingleThreadEventExecutor 的 run() 方法，它在 NioEventLoop 中实现了
+                    /**
+                     * 线程启动以后，会执行 NioEventLoop 中的 run() 方法，这是一个非常重要的方法，这个方法肯定是没那么容易结束的，必然是像 JDK 线程池的 Worker 那样，
+                     * 不断地循环获取新的任务的。它需要不断地做 select 操作和轮询 taskQueue 这个队列
+                     */
                     SingleThreadEventExecutor.this.run();
                     success = true;
                 } catch (Throwable t) {

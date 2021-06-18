@@ -81,11 +81,9 @@ public class SubReactorThread extends Thread{
                         System.out.println(buf.capacity());
                         clientChannel.read(buf);
 
-
                         //转发请求到具体的业务线程；当然，这里其实可以向dubbo那样，支持转发策略，如果执行时间短，
                         //，比如没有数据库操作等，可以在io线程中执行。本实例，转发到业务线程池
                         dispatch(clientChannel, buf);
-
                     }
                 } catch (Throwable e) {
                     e.printStackTrace();
@@ -126,14 +124,4 @@ public class SubReactorThread extends Thread{
     private void dispatch(SocketChannel sc, ByteBuffer reqBuffer) {
         businessExecutorPool.submit( new Handler(sc, reqBuffer, this)  );
     }
-
-
-
-
-
-
-
-
-
-
 }

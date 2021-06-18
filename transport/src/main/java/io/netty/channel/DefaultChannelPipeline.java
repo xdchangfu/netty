@@ -1379,7 +1379,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
         @Override
         public void channelRegistered(ChannelHandlerContext ctx) {
+            // 这一步是 head 对于 channelRegistered 事件的处理。
             invokeHandlerAddedIfNeeded();
+            // 向后传播 Inbound 事件
             ctx.fireChannelRegistered();
         }
 

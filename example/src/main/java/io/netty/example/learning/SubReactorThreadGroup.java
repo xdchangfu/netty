@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * nio 线程组;简易的NIO线程组
  */
 public class SubReactorThreadGroup {
-
+    // 请求计数器
     private static final AtomicInteger requestcounter = new AtomicInteger();
 
     // 线程池IO线程的数量

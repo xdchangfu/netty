@@ -27,6 +27,11 @@ public interface ChannelPromise extends ChannelFuture, Promise<Void> {
     @Override
     Channel channel();
 
+    /**
+     * 下面几个方法是覆写 Promise 中的接口，为了返回值类型是 ChannelPromise
+     * @param result
+     * @return
+     */
     @Override
     ChannelPromise setSuccess(Void result);
 

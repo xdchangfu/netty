@@ -5,6 +5,9 @@ import java.nio.channels.*;
 import java.util.Iterator;
 import java.util.Set;
 
+/**
+ * 主Reactor,主要用来处理连接请求的反应堆
+ */
 public class MainReactor implements Runnable{
 
     private Selector selector;
@@ -26,9 +29,7 @@ public class MainReactor implements Runnable{
         System.out.println("MainReactor is running");
 
         while (!Thread.interrupted()) {
-
             Set<SelectionKey> ops = null;
-
             try {
                 selector.select(1000);
                 ops = selector.selectedKeys();
@@ -37,6 +38,7 @@ public class MainReactor implements Runnable{
             }
 
             // 处理相关事件
+            // TODO Auto-generated method stub
             for (Iterator<SelectionKey> it = ops.iterator(); it.hasNext();) {
                 SelectionKey key = it.next();
                 it.remove();
@@ -52,6 +54,8 @@ public class MainReactor implements Runnable{
                     }
                 } catch (Throwable e) {
                     e.printStackTrace();
+                    System.out.println("客户端主动断开连接。。。。。。。");
+
                 }
             }
         }

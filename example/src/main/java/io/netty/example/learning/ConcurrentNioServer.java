@@ -7,6 +7,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * 主从多线程模型(Reactor)
+ * 职责维护java.nio.ServerSocketChannel类，绑定服务端监听端口，然后将该通道注册到MainRector中
+ */
 public class ConcurrentNioServer {
 
     private static final int DEFAULT_PORT = 9080;

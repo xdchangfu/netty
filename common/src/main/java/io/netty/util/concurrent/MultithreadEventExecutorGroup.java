@@ -117,9 +117,11 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
             }
         }
 
+        // 通过之前设置的 chooserFactory 来实例化 Chooser，把线程池数组传进去
         chooser = chooserFactory.newChooser(children);
 
-        // 添加相关事件通知处理器
+        // 设置一个 Listener 用来监听该线程池的 termination 事件
+        // 给池中每一个线程都设置这个 listener，当监听到所有线程都 terminate 以后，这个线程池就算真正的 terminate 了
         final FutureListener<Object> terminationListener = new FutureListener<Object>() {
             @Override
             public void operationComplete(Future<Object> future) throws Exception {
@@ -133,8 +135,10 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
             e.terminationFuture().addListener(terminationListener);
         }
 
+        // 设置 readonlyChildren，它是只读集合
         Set<EventExecutor> childrenSet = new LinkedHashSet<EventExecutor>(children.length);
         Collections.addAll(childrenSet, children);
+        // 设置 childrenSet 为不可修改
         readonlyChildren = Collections.unmodifiableSet(childrenSet);
     }
 

@@ -42,7 +42,13 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(PooledByteBufAllocator.class);
 
+    /**
+     * PoolArena 的个数，从下文的初始化中可以看出，取值为 CPU 核心逻辑线程数与 （最大运行内存【堆内存或堆外内存】的大小的二分之一 除以每个 Chunk-size, 并除以3，是确保每个 PoolArena 包含三个 Chunk）
+     */
     private static final int DEFAULT_NUM_HEAP_ARENA;
+    /**
+     * 与 DEFAULT_NUM_HEAP_ARENA  含义相同，堆外内存
+     */
     private static final int DEFAULT_NUM_DIRECT_ARENA;
 
     /**
@@ -74,9 +80,9 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
     };
 
     static {
-        // 初始化 DEFAULT_PAGE_SIZE 为默认的8K, PageSize 不能小于4K 并必须是2的幂
         int defaultAlignment = SystemPropertyUtil.getInt(
                 "io.netty.allocator.directMemoryCacheAlignment", 0);
+        // 初始化 DEFAULT_PAGE_SIZE 为默认的8K, PageSize 不能小于4K 并必须是2的幂
         int defaultPageSize = SystemPropertyUtil.getInt("io.netty.allocator.pageSize", 8192);
         Throwable pageSizeFallbackCause = null;
         try {

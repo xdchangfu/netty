@@ -164,6 +164,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 rejectedExecutionHandler);
         this.provider = ObjectUtil.checkNotNull(selectorProvider, "selectorProvider");
         this.selectStrategy = ObjectUtil.checkNotNull(strategy, "selectStrategy");
+        // 开启 NIO 中最重要的组件：Selector
         final SelectorTuple selectorTuple = openSelector();
         this.selector = selectorTuple.selector;
         this.unwrappedSelector = selectorTuple.unwrappedSelector;
@@ -394,6 +395,10 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         return selector.keys().size() - cancelledKeys;
     }
 
+    /**
+     * 首先，调用者必须是EventExecutor的当前线程，然后就是新建一个Selector,然后将原来注册在Selector的通道，事件重新注册到新的Selector( selector.keys())，
+     * 并取消在原Selector上的事件（取消操作非常重要，因为如果不取消，Selector关闭后，注册在Selector上的通道都将关闭）然后关闭旧的Selector以释放相关资源
+     */
     private void rebuildSelector0() {
         final Selector oldSelector = selector;
         final SelectorTuple newSelectorTuple;
@@ -458,11 +463,23 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     @Override
     protected void run() {
+        /**
+         * 核心功能点：
+         * 首先，会根据 hasTasks() 的结果来决定是执行 selectNow() 还是 select(oldWakenUp)，这个应该好理解。
+         *      如果有任务正在等待，那么应该使用无阻塞的 selectNow()，如果没有任务在等待，那么就可以使用带阻塞的 select 操作。
+         * ioRatio 控制 IO 操作所占的时间比重：如果设置为 100%，那么先执行 IO 操作，然后再执行任务队列中的任务。
+         * 如果不是 100%，那么先执行 IO 操作，然后执行 taskQueue 中的任务，但是需要控制执行任务的总时间，这个时间通过 ioRatio，以及这次 IO 操作耗时计算得出。
+         */
         int selectCnt = 0;
         for (;;) {
             try {
                 int strategy;
                 try {
+                    // selectStrategy 终于要派上用场了
+                    // 它有两个值，一个是 CONTINUE 一个是 SELECT
+                    // 针对这块代码，我们分析一下，如果 taskQueue 不为空，也就是 hasTasks() 返回 true，
+                    //         那么执行一次 selectNow()，因为该方法不会阻塞
+                    // 如果 hasTasks() 返回 false，那么执行 SelectStrategy.SELECT 分支，进行 select(...)，这块是带阻塞的
                     strategy = selectStrategy.calculateStrategy(selectNowSupplier, hasTasks());
                     switch (strategy) {
                     case SelectStrategy.CONTINUE:
@@ -479,6 +496,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                         nextWakeupNanos.set(curDeadlineNanos);
                         try {
                             if (!hasTasks()) {
+                                // select 阻塞
                                 strategy = select(curDeadlineNanos);
                             }
                         } finally {
@@ -501,23 +519,30 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 selectCnt++;
                 cancelledKeys = 0;
                 needsToSelectAgain = false;
+                // 默认地，ioRatio 的值是 50
                 final int ioRatio = this.ioRatio;
                 boolean ranTasks;
+                // 如果 ioRatio 设置为 100，那么先执行 IO 操作，然后在 finally 块中执行 taskQueue 中的任务
                 if (ioRatio == 100) {
                     try {
                         if (strategy > 0) {
+                            // 执行 IO 操作。因为前面 select 以后，可能有些 channel 是需要处理的。
                             processSelectedKeys();
                         }
                     } finally {
                         // Ensure we always run tasks.
+                        // 执行非 IO 任务，也就是 taskQueue 中的任务
                         ranTasks = runAllTasks();
                     }
                 } else if (strategy > 0) {
+                    // 如果 ioRatio 不是 100，那么根据 IO 操作耗时，限制非 IO 操作耗时
                     final long ioStartTime = System.nanoTime();
                     try {
+                        // 执行 IO 操作
                         processSelectedKeys();
                     } finally {
                         // Ensure we always run tasks.
+                        // 根据 IO 操作消耗的时间，计算执行非 IO 操作（runAllTasks）可以用多少时间.
                         final long ioTime = System.nanoTime() - ioStartTime;
                         ranTasks = runAllTasks(ioTime * (100 - ioRatio) / ioRatio);
                     }

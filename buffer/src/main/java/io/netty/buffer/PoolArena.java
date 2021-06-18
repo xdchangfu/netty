@@ -44,6 +44,9 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         Normal
     }
 
+    /**
+     * 分配 PoolArena 的类，也就是 PoolArena 的构造方法被 PooledByteBufAllocator 调用
+     */
     final PooledByteBufAllocator parent;
 
     final int numSmallSubpagePools;

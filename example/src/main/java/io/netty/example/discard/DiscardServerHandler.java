@@ -28,16 +28,6 @@ public class DiscardServerHandler extends SimpleChannelInboundHandler<Object> {
     @Override
     public void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
         // discard
-        ByteBuf in = (ByteBuf) msg;
-        try {
-            while (in.isReadable()) {
-                System.out.println(in.readByte());
-
-                System.out.flush();
-            }
-        } finally {
-            ReferenceCountUtil.release(msg);
-        }
     }
 
     @Override
