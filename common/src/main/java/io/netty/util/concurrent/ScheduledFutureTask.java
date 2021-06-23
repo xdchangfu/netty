@@ -45,7 +45,8 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
     private long id;
 
     private long deadlineNanos;
-    /* 0 - no repeat, >0 - repeat at fixed rate, <0 - repeat with fixed delay */
+    /* 0 - no repeat, >0 - repeat at fixed rate, <0 - repeat with fixed delay
+    * 0 - 不重复，>0 - 以固定速率重复，<0 - 以固定延迟重复*/
     private final long periodNanos;
 
     private int queueIndex = INDEX_NOT_IN_QUEUE;
@@ -165,6 +166,7 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
                 }
                 return;
             }
+            // 若干时间后执行一次, 执行完该任务就结束了
             if (periodNanos == 0) {
                 if (setUncancellableInternal()) {
                     V result = runTask();
@@ -172,12 +174,16 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
                 }
             } else {
                 // check if is done as it may was cancelled
+                // 检查是否已完成，因为它可能已被取消
                 if (!isCancelled()) {
                     runTask();
                     if (!executor().isShutdown()) {
+                        // 固定频率执行某个任务
                         if (periodNanos > 0) {
+                            // 下一次截止时间为本次的截止时间 + 间隔时间（periodNanos）
                             deadlineNanos += periodNanos;
-                        } else {
+                        } else {    // 每次任务执行完毕之后，间隔多长时间之后再次执行
+                            // 截止时间 = 当前时间 + 间隔时间
                             deadlineNanos = nanoTime() - periodNanos;
                         }
                         if (!isCancelled()) {

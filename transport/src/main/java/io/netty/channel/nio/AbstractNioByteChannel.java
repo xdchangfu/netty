@@ -94,6 +94,9 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                 ((SocketChannelConfig) config).isAllowHalfClosure();
     }
 
+    /**
+     * 与连接的字节数据读写相关的
+     */
     protected class NioByteUnsafe extends AbstractNioUnsafe {
 
         private void closeOnRead(ChannelPipeline pipeline) {
@@ -213,6 +216,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
      * @throws Exception if an I/O exception occurs during write.
      */
     protected final int doWrite0(ChannelOutboundBuffer in) throws Exception {
+        // 拿到第一个需要flush的节点的数据
         Object msg = in.current();
         if (msg == null) {
             // Directly return here so incompleteWrite(...) is not called.
@@ -223,6 +227,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
 
     private int doWriteInternal(ChannelOutboundBuffer in, Object msg) throws Exception {
         if (msg instanceof ByteBuf) {
+            // 强转为 ByteBuf，若发现没有数据可读，直接删除该节点
             ByteBuf buf = (ByteBuf) msg;
             if (!buf.isReadable()) {
                 in.remove();

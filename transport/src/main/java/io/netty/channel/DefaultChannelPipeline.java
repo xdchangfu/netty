@@ -199,10 +199,13 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     public final ChannelPipeline addLast(EventExecutorGroup group, String name, ChannelHandler handler) {
         final AbstractChannelHandlerContext newCtx;
         synchronized (this) {
+            // 1.检查是否有重复handler
             checkMultiplicity(handler);
 
+            // 2.创建节点
             newCtx = newContext(group, filterName(name, handler), handler);
 
+            // 3.添加节点
             addLast0(newCtx);
 
             // If the registered is false it means that the channel was not registered on an eventLoop yet.
@@ -220,6 +223,8 @@ public class DefaultChannelPipeline implements ChannelPipeline {
                 return this;
             }
         }
+
+        // 4.回调用户方法
         callHandlerAdded0(newCtx);
         return this;
     }
@@ -385,14 +390,17 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     }
 
     private String generateName(ChannelHandler handler) {
+        // 先查看缓存中是否有生成过默认name
         Map<Class<?>, String> cache = nameCaches.get();
         Class<?> handlerType = handler.getClass();
         String name = cache.get(handlerType);
+        // 没有生成过，就生成一个默认name，加入缓存
         if (name == null) {
             name = generateName0(handlerType);
             cache.put(handlerType, name);
         }
 
+        // 生成完了，还要看默认name有没有冲突
         // It's not very likely for a user to put more than one handler of the same type, but make sure to avoid
         // any name conflicts.  Note that we don't cache the names generated here.
         if (context0(name) != null) {
@@ -595,6 +603,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     private static void checkMultiplicity(ChannelHandler handler) {
         if (handler instanceof ChannelHandlerAdapter) {
             ChannelHandlerAdapter h = (ChannelHandlerAdapter) handler;
+            // 一个Handler如果是sharable(可共享)的，就可以无限次被添加到pipeline中, 只需要在 业务Handler上加入注解 @Sharable 就可以实现
             if (!h.isSharable() && h.added) {
                 throw new ChannelPipelineException(
                         h.getClass().getName() +

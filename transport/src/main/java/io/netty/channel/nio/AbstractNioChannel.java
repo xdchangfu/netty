@@ -256,7 +256,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
                     requestedRemoteAddress = remoteAddress;
 
                     // Schedule connect timeout.
-                    // 下面这块代码，在处理连接超时的情况，代码很简单
+                    // 在处理连接超时的情况，代码很简单
                     // 这里用到了 NioEventLoop 的定时任务的功能
                     int connectTimeoutMillis = config().getConnectTimeoutMillis();
                     if (connectTimeoutMillis > 0) {
@@ -383,6 +383,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         boolean selected = false;
         for (;;) {
             try {
+                //调用jdk api register注册方法,这个javaChannel是在创建服务端channel的时候会创建一个jdk底层的channel，然后把这个channel进行保存，保存到成员变量ch里面
+                //register需要三个参数`selector，ops,att`
                 selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this);
                 return;
             } catch (CancelledKeyException e) {

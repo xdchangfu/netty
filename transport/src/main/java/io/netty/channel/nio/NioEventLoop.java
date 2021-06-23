@@ -374,6 +374,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     }
 
     /**
+     * JDK 空轮询 BUG
      * Replaces the current {@link Selector} of this event loop with newly created {@link Selector}s to work
      * around the infamous epoll 100% CPU bug.
      */
@@ -396,6 +397,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     }
 
     /**
+     * JDK 空轮询 BUG
      * 首先，调用者必须是EventExecutor的当前线程，然后就是新建一个Selector,然后将原来注册在Selector的通道，事件重新注册到新的Selector( selector.keys())，
      * 并取消在原Selector上的事件（取消操作非常重要，因为如果不取消，Selector关闭后，注册在Selector上的通道都将关闭）然后关闭旧的Selector以释放相关资源
      */
@@ -608,6 +610,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             // Rebuild the selector to work around the problem.
             logger.warn("Selector.select() returned prematurely {} times in a row; rebuilding Selector {}.",
                     selectCnt, selector);
+            // JDK 空轮询 BUG
             rebuildSelector();
             return true;
         }
@@ -626,10 +629,15 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
     }
 
+    /**
+     * 处理 IO 事件（process selected keys）
+     */
     private void processSelectedKeys() {
         if (selectedKeys != null) {
+            // 处理优化过的selectedKeys
             processSelectedKeysOptimized();
         } else {
+            // 正常的处理
             processSelectedKeysPlain(selector.selectedKeys());
         }
     }
@@ -701,6 +709,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
             final Object a = k.attachment();
 
+            // 处理该 channel
             if (a instanceof AbstractNioChannel) {
                 processSelectedKey(k, (AbstractNioChannel) a);
             } else {
@@ -708,12 +717,14 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 NioTask<SelectableChannel> task = (NioTask<SelectableChannel>) a;
                 processSelectedKey(k, task);
             }
-
+            // 判断是否该再来次轮询
             if (needsToSelectAgain) {
                 // null out entries in the array to allow to have it GC'ed once the Channel close
                 // See https://github.com/netty/netty/issues/2363
                 selectedKeys.reset(i + 1);
 
+                // 每满256次，就会进入到if的代码块，
+                // 首先，将selectedKeys的内部数组全部清空，方便被jvm垃圾回收，然后重新调用selectAgain重新填装一下 selectionKey
                 selectAgain();
                 i = -1;
             }
@@ -763,6 +774,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 ch.unsafe().forceFlush();
             }
 
+            // 新连接的已准备接入或者已存在的连接有数据可读
             // Also check for readOps of 0 to workaround possible JDK bug which may otherwise lead
             // to a spin loop
             if ((readyOps & (SelectionKey.OP_READ | SelectionKey.OP_ACCEPT)) != 0 || readyOps == 0) {

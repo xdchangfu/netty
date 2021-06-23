@@ -481,6 +481,10 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     /**
+     * 步骤：
+     *  从scheduledTaskQueue转移定时任务到taskQueue(mpsc queue)
+     *  计算本次任务循环的截止时间
+     *  执行任务
      * Poll all tasks from the task queue and run them via {@link Runnable#run()} method.  This method stops running
      * the tasks in the task queue and returns if it ran longer than {@code timeoutNanos}.
      */
@@ -496,10 +500,14 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         long runTasks = 0;
         long lastExecutionTime;
         for (;;) {
+            // 确保任务安全执行，忽略任何异常
             safeExecute(task);
 
+            // 将已运行任务 runTasks 加一
             runTasks ++;
 
+            // 每隔0x3F任务，即每执行完64个任务之后，判断当前时间是否超过本次reactor任务循环的截止时间了，
+            // 如果超过，那就break掉，如果没有超过，那就继续执行
             // Check timeout every 64 tasks because nanoTime() is relatively expensive.
             // XXX: Hard-coded value - will make it configurable if it is really a problem.
             if ((runTasks & 0x3F) == 0) {
@@ -877,7 +885,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             }
         }
 
-        // 唤醒选择器，感觉这里addTaskWakesUp 这个变量有点问题，不过具体的唤醒选择器逻辑是对于事件模型来说比较重要，在相关的子类中都有重写
+        // 唤醒 Selector 阻塞，感觉这里addTaskWakesUp 这个变量有点问题，不过具体的唤醒选择器逻辑是对于事件模型来说比较重要，在相关的子类中都有重写
         if (!addTaskWakesUp && immediate) {
             wakeup(inEventLoop);
         }

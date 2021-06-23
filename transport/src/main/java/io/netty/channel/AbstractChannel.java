@@ -526,7 +526,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 safeSetSuccess(promise);
 
                 // 当前的 register 操作已经成功，该事件应该被 pipeline 上
-                //   所有关心 register 事件的 handler 感知到，往 pipeline 中扔一个事件
+                // 所有关心 register 事件的 handler 感知到，往 pipeline 中扔一个事件
                 pipeline.fireChannelRegistered();
 
                 // Only fire a channelActive if the channel has never been registered. This prevents firing

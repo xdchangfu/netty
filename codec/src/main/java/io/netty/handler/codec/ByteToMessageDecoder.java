@@ -84,6 +84,8 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
  */
 
     /**
+     * 累加器
+     * 每次都将读取到的数据通过内存拷贝的方式，拼接到一个大的字节容器中，这个字节容器在 ByteToMessageDecoder中叫做 cumulation
      * Cumulate {@link ByteBuf}s by merge them into one {@link ByteBuf}'s, using memory copies.
      */
     public static final Cumulator MERGE_CUMULATOR = new Cumulator() {
@@ -308,7 +310,7 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
                 first = cumulation == null;
                 cumulation = cumulator.cumulate(ctx.alloc(),
                         first ? Unpooled.EMPTY_BUFFER : cumulation, (ByteBuf) msg);
-                // 解码器具体逻辑实现
+                // 解码器具体逻辑实现(将累加到的数据传递给业务进行拆包)
                 callDecode(ctx, cumulation, out);
             } catch (DecoderException e) {
                 throw e;

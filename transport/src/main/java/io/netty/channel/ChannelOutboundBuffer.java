@@ -141,14 +141,18 @@ public final class ChannelOutboundBuffer {
      */
     public void addMessage(Object msg, int size, ChannelPromise promise) {
         // ChannelOutboundBuffer内部使用Entry(链表节点)来存放待写入的内容，比如ByteBuf,然后初始化size,totalSize两个属性
+        // 创建一个待写出的消息节点
         Entry entry = Entry.newInstance(msg, size, total(msg), promise);
         if (tailEntry == null) {
+            // flushedEntry 指针表示第一个被写到操作系统Socket缓冲区中的节点
             flushedEntry = null;
         } else {
             Entry tail = tailEntry;
             tail.next = entry;
         }
+        // tailEntry指针表示ChannelOutboundBuffer缓冲区的最后一个节点
         tailEntry = entry;
+        // unFlushedEntry 指针表示第一个未被写入到操作系统Socket缓冲区中的节点
         if (unflushedEntry == null) {
             unflushedEntry = entry;
         }
